@@ -10,6 +10,7 @@ import "../core/span-icon.js";
 import "../core/span-switch.js";
 import "./span-menu-button.js";
 import { DashboardTab } from "./tab-dashboard.js";
+import { HouseTab, fetchHouse, type House } from "./tab-house.js";
 import { MonitoringTab } from "./tab-monitoring.js";
 import { AdoptedTab } from "./tab-adopted.js";
 import { ListViewController, type FavoritesViewStateDetail } from "../core/list-view-controller.js";
@@ -70,6 +71,12 @@ export class SpanPanelElement extends LitElement {
   @state() private _chartMetric: string | undefined;
   @state() private _listColumns: number = loadListColumns();
   @state() private _favorites: FavoritesMap = {};
+  /**
+   * The house, while the By Panel tab is showing one: every panel in a single
+   * view, so the panel selector is hidden there. Null for a one-panel install,
+   * an integration that cannot describe a house, and every other tab.
+   */
+  @state() private _house: House | null = null;
 
   private _favoritesViewState: FavoritesViewState = defaultFavoritesViewState();
   /**
@@ -81,6 +88,7 @@ export class SpanPanelElement extends LitElement {
   private _favoritesPanelStats: FavoritesPanelStatsInfo[] = [];
 
   private _dashboardTab = new DashboardTab();
+  private _houseTab = new HouseTab();
   private _monitoringTab = new MonitoringTab();
   private _adoptedTab = new AdoptedTab();
   private _listDashCtrl = new DashboardController();
@@ -259,6 +267,7 @@ export class SpanPanelElement extends LitElement {
     super.connectedCallback();
 
     this._dashboardTab.errorStore = this._errorStore;
+    this._houseTab.errorStore = this._errorStore;
     this._listDashCtrl.errorStore = this._errorStore;
     this._favCache.errorStore = this._errorStore;
     this._monitoringTab.errorStore = this._errorStore;
@@ -280,6 +289,7 @@ export class SpanPanelElement extends LitElement {
 
   disconnectedCallback(): void {
     this._dashboardTab.stop();
+    this._houseTab.stop();
     this._monitoringTab.stop();
     this._adoptedTab.stop();
     this._listCtrl.stop();
@@ -312,6 +322,7 @@ export class SpanPanelElement extends LitElement {
     if (changedProps.has("hass")) {
       const oldHass = changedProps.get("hass") as HomeAssistant | undefined;
       this._dashboardTab.hass = this.hass;
+      this._houseTab.hass = this.hass;
       this._listDashCtrl.hass = this.hass;
       this._errorStore.updateHass(this.hass);
 
@@ -437,11 +448,15 @@ export class SpanPanelElement extends LitElement {
         <div class="toolbar">
           <span-menu-button .narrow=${this.narrow}></span-menu-button>
           <div class="main-title">
-            <span class="panel-selector">
-              <select id="panel-select" @change=${this._onPanelChange}>
-                ${this._panels.map(p => html` <option value=${p.id} ?selected=${p.id === this._selectedPanelId}>${p.name_by_user || p.name || p.id}</option> `)}
-              </select>
-            </span>
+            ${this._activeTab === "dashboard" && this._house
+              ? nothing
+              : html`<span class="panel-selector">
+                  <select id="panel-select" @change=${this._onPanelChange}>
+                    ${this._panels.map(
+                      p => html` <option value=${p.id} ?selected=${p.id === this._selectedPanelId}>${p.name_by_user || p.name || p.id}</option> `
+                    )}
+                  </select>
+                </span>`}
             <div class="panel-tabs" @click=${this._onTabClick}>${unsafeHTML(buildTabBarHTML(this._buildTabList(), this._activeTab, "text"))}</div>
           </div>
         </div>
@@ -1068,6 +1083,7 @@ export class SpanPanelElement extends LitElement {
   private async _renderTab(): Promise<void> {
     const superseded = this._beginRender();
 
+    this._houseTab.stop();
     this._dashboardTab.stop();
     this._monitoringTab.stop();
     this._adoptedTab.stop();
@@ -1094,6 +1110,15 @@ export class SpanPanelElement extends LitElement {
       case "dashboard": {
         container.innerHTML = "";
         const config = this._buildDashboardConfig();
+        // A house of several panels shows them all here, upstream first, so
+        // there is no panel to pick; one panel renders as it always has.
+        const house = await fetchHouse(this.hass);
+        if (superseded()) return;
+        this._house = house;
+        if (house) {
+          await this._houseTab.render(container, this.hass, config, house);
+          break;
+        }
         const dashDevice = this._panels.find(p => p.id === this._selectedPanelId);
         const dashEntryId = dashDevice?.config_entry_id ?? null;
         const rendered = await this._dashboardTab.render(container, this.hass, this._selectedPanelId ?? "", config, dashEntryId);

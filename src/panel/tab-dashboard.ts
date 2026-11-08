@@ -2,7 +2,7 @@ import { discoverTopology } from "../card/card-discovery.js";
 import { escapeHtml } from "../helpers/sanitize.js";
 import { errorText } from "../helpers/error-text.js";
 import { buildHeaderHTML } from "../core/header-renderer.js";
-import { buildGridHTML } from "../core/grid-renderer.js";
+import { buildGridHTML, firstGridRow } from "../core/grid-renderer.js";
 import { buildSubDevicesHTML } from "../core/sub-device-renderer.js";
 import { buildMonitoringSummaryHTML } from "../core/monitoring-status.js";
 import { DashboardController } from "../core/dashboard-controller.js";
@@ -82,11 +82,13 @@ export class DashboardTab {
     await this._ctrl.fetchAndBuildHorizonMaps();
 
     const totalRows = Math.ceil(panelSize / 2);
+    const firstRow = firstGridRow(topology!);
+    const drawnRows = totalRows - firstRow + 1;
     const monitoringStatus = this._ctrl.monitoringCache.status;
 
     const headerHTML = buildHeaderHTML(topology!, config);
     const monitoringSummaryHTML = buildMonitoringSummaryHTML(monitoringStatus);
-    const gridHTML = buildGridHTML(topology!, totalRows, hass, config, monitoringStatus);
+    const gridHTML = buildGridHTML(topology!, totalRows, hass, config, monitoringStatus, firstRow);
     const subDevHTML = buildSubDevicesHTML(topology!, hass, config, { showFavorites: this._ctrl.showFavorites });
 
     container.innerHTML = `
@@ -97,7 +99,7 @@ export class DashboardTab {
       ${
         config.show_panel !== false
           ? `
-        <div class="panel-grid" style="grid-template-rows: repeat(${totalRows}, auto);">
+        <div class="panel-grid" style="grid-template-rows: repeat(${drawnRows}, auto);">
           ${gridHTML}
         </div>
       `

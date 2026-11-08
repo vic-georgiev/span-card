@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildGridHTML, renderCircuitSlot } from "../src/core/grid-renderer.js";
+import { buildGridHTML, firstGridRow, renderCircuitSlot } from "../src/core/grid-renderer.js";
 import type { Circuit, HomeAssistant, CardConfig, MonitoringPointInfo, PanelTopology } from "../src/types.js";
 
 const hass = { states: {}, services: {}, language: "en" } as unknown as HomeAssistant;
@@ -168,5 +168,30 @@ describe("a slot's reading on the grid", () => {
   it("draws the monitor's figure beside a measured current", () => {
     const slot = slotOf({ [SWITCH]: { state: "on" }, [CURRENT]: { state: "10" } }, config, { utilization_pct: 45 });
     expect(slot.querySelector(".utilization")!.textContent).toBe("45%");
+  });
+});
+
+describe("a panel whose spaces start below its main-breaker module", () => {
+  const topology = {
+    circuits: {
+      kitchen: makeCircuit({ name: "Kitchen", tabs: [9] }),
+      battery: makeCircuit({ name: "Battery", tabs: [46, 48] }),
+    },
+    first_space: 9,
+  } as unknown as PanelTopology;
+
+  it("starts the grid at the row of its first space", () => {
+    expect(firstGridRow(topology)).toBe(5);
+    expect(firstGridRow({ circuits: {} } as unknown as PanelTopology)).toBe(1);
+  });
+
+  it("draws no rows above it, and keeps the panel's own space numbers", () => {
+    const html = buildGridHTML(topology, 24, hass, config, null, firstGridRow(topology));
+    const labels = [...html.matchAll(/class="tab-label tab-left" style="grid-row: (\d+);[^>]*>(\d+)</g)].map(m => [Number(m[1]), Number(m[2])]);
+    expect(labels[0]).toEqual([1, 9]); // space 9 is the first drawn row
+    expect(labels.at(-1)).toEqual([20, 47]); // 20 rows for spaces 9..48
+    expect(html).not.toMatch(/>1<\/div>/);
+    // The battery's two-pole breaker spans its two rows, 46 above 48.
+    expect(html).toMatch(/grid-row: 19 \/ span 2;[^"]*"[^>]*>|grid-row: 19 \/ span 2/);
   });
 });

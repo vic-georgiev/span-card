@@ -102,6 +102,12 @@ export interface PanelTopology {
   serial?: string;
   firmware?: string;
   panel_size?: number;
+  /**
+   * The panel's lowest breaker space. 1 on most panels; 9 on a SPAN MAIN 40 or
+   * 16, whose first eight positions are the main-breaker module and hold no
+   * breakers, so the grid starts below them. Absent from older integrations.
+   */
+  first_space?: number;
   /** The device id the request carried, echoed as sent. */
   device_id?: string;
   /**

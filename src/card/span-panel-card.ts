@@ -5,7 +5,7 @@ import { setLanguage, t } from "../i18n.js";
 import { escapeHtml } from "../helpers/sanitize.js";
 import { loadListColumns } from "../helpers/list-columns.js";
 import { buildHeaderHTML } from "../core/header-renderer.js";
-import { buildGridHTML } from "../core/grid-renderer.js";
+import { buildGridHTML, firstGridRow } from "../core/grid-renderer.js";
 import { buildSubDevicesHTML } from "../core/sub-device-renderer.js";
 import { buildMonitoringSummaryHTML } from "../core/monitoring-status.js";
 import { DashboardController } from "../core/dashboard-controller.js";
@@ -455,17 +455,18 @@ export class SpanPanelCard extends LitElement {
 
     if (this._activeTab === "panel") {
       const totalRows = Math.ceil(this._panelSize / 2);
+      const firstRow = firstGridRow(this._topology);
       const headerHTML = buildHeaderHTML(this._topology, this._config);
       const monitoringStatus = this._ctrl.monitoringCache.status;
       const monitoringSummaryHTML = buildMonitoringSummaryHTML(monitoringStatus);
-      const gridHTML = buildGridHTML(this._topology, totalRows, this.hass, this._config, monitoringStatus);
+      const gridHTML = buildGridHTML(this._topology, totalRows, this.hass, this._config, monitoringStatus, firstRow);
       const subDevHTML = buildSubDevicesHTML(this._topology, this.hass, this._config, { showFavorites: this._ctrl.showFavorites });
 
       container.innerHTML = `
         ${headerHTML}
         ${monitoringSummaryHTML}
         ${subDevHTML ? `<div class="sub-devices">${subDevHTML}</div>` : ""}
-        ${this._config.show_panel !== false ? `<div class="panel-grid" style="grid-template-rows: repeat(${totalRows}, auto);">${gridHTML}</div>` : ""}
+        ${this._config.show_panel !== false ? `<div class="panel-grid" style="grid-template-rows: repeat(${totalRows - firstRow + 1}, auto);">${gridHTML}</div>` : ""}
       `;
 
       const slideEl = container.querySelector(".slide-confirm");

@@ -26,6 +26,15 @@ interface TabMapEntry {
 }
 
 /**
+ * The first grid row that holds breaker spaces: the row of the panel's first
+ * space. Spaces run two to a row, odd on the left, so space 9 is row 5.
+ */
+export function firstGridRow(topology: PanelTopology): number {
+  const first = topology.first_space;
+  return typeof first === "number" && first > 1 ? Math.ceil(first / 2) : 1;
+}
+
+/**
  * Build the full grid HTML for the panel breaker grid.
  */
 export function buildGridHTML(
@@ -33,7 +42,8 @@ export function buildGridHTML(
   totalRows: number,
   hass: HomeAssistant,
   config: CardConfig,
-  monitoringStatus: MonitoringStatus | null
+  monitoringStatus: MonitoringStatus | null,
+  firstRow = 1
 ): string {
   const tabMap = new Map<number, TabMapEntry>();
   const occupiedTabs = new Set<number>();
@@ -71,41 +81,46 @@ export function buildGridHTML(
     return { monInfo, sheddingPriority };
   }
 
+  // Rows above ``firstRow`` hold no breaker spaces at all (a SPAN MAIN 40 or
+  // 16 numbers its spaces from 9, below its main-breaker module), so they are
+  // not drawn; ``gr`` is the row's place in the drawn grid, ``row`` its place
+  // on the panel, which the tab numbers still follow.
   let gridHTML = "";
-  for (let row = 1; row <= totalRows; row++) {
+  for (let row = Math.max(1, firstRow); row <= totalRows; row++) {
+    const gr = row - Math.max(1, firstRow) + 1;
     const leftTab = row * 2 - 1;
     const rightTab = row * 2;
     const leftEntry = tabMap.get(leftTab);
     const rightEntry = tabMap.get(rightTab);
 
-    gridHTML += `<div class="tab-label tab-left" style="grid-row: ${row}; grid-column: 1;">${leftTab}</div>`;
+    gridHTML += `<div class="tab-label tab-left" style="grid-row: ${gr}; grid-column: 1;">${leftTab}</div>`;
 
     if (leftEntry && leftEntry.layout === "row-span") {
       const { monInfo, sheddingPriority } = lookupMonitoring(leftEntry);
-      gridHTML += renderCircuitSlot(leftEntry.uuid, leftEntry.circuit, row, "2 / 5", "row-span", hass, config, monInfo, sheddingPriority);
-      gridHTML += `<div class="tab-label tab-right" style="grid-row: ${row}; grid-column: 5;">${rightTab}</div>`;
+      gridHTML += renderCircuitSlot(leftEntry.uuid, leftEntry.circuit, gr, "2 / 5", "row-span", hass, config, monInfo, sheddingPriority);
+      gridHTML += `<div class="tab-label tab-right" style="grid-row: ${gr}; grid-column: 5;">${rightTab}</div>`;
       continue;
     }
 
     if (!rowsToSkipLeft.has(row)) {
       if (leftEntry && (leftEntry.layout === "col-span" || leftEntry.layout === "single")) {
         const { monInfo, sheddingPriority } = lookupMonitoring(leftEntry);
-        gridHTML += renderCircuitSlot(leftEntry.uuid, leftEntry.circuit, row, "2", leftEntry.layout, hass, config, monInfo, sheddingPriority);
+        gridHTML += renderCircuitSlot(leftEntry.uuid, leftEntry.circuit, gr, "2", leftEntry.layout, hass, config, monInfo, sheddingPriority);
       } else if (!occupiedTabs.has(leftTab)) {
-        gridHTML += renderEmptySlot(row, "2");
+        gridHTML += renderEmptySlot(gr, "2");
       }
     }
 
     if (!rowsToSkipRight.has(row)) {
       if (rightEntry && (rightEntry.layout === "col-span" || rightEntry.layout === "single")) {
         const { monInfo, sheddingPriority } = lookupMonitoring(rightEntry);
-        gridHTML += renderCircuitSlot(rightEntry.uuid, rightEntry.circuit, row, "4", rightEntry.layout, hass, config, monInfo, sheddingPriority);
+        gridHTML += renderCircuitSlot(rightEntry.uuid, rightEntry.circuit, gr, "4", rightEntry.layout, hass, config, monInfo, sheddingPriority);
       } else if (!occupiedTabs.has(rightTab)) {
-        gridHTML += renderEmptySlot(row, "4");
+        gridHTML += renderEmptySlot(gr, "4");
       }
     }
 
-    gridHTML += `<div class="tab-label tab-right" style="grid-row: ${row}; grid-column: 5;">${rightTab}</div>`;
+    gridHTML += `<div class="tab-label tab-right" style="grid-row: ${gr}; grid-column: 5;">${rightTab}</div>`;
   }
   return gridHTML;
 }
