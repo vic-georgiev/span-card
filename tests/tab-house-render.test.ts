@@ -73,7 +73,7 @@ function hass(): HomeAssistant {
       "sensor.main_40_power": state("sensor.main_40_power", "3000"),
       "sensor.main_16_power": state("sensor.main_16_power", "405"),
       "sensor.main_40_feedthrough_power": state("sensor.main_40_feedthrough_power", "412"),
-      "sensor.main_16_feed_check": state("sensor.main_16_feed_check", "7", { upstream_w: 412, this_panel_w: 405 }),
+      "sensor.main_16_feed_check": state("sensor.main_16_feed_check", "7", { upstream_w: 412, this_panel_w: 405, average_difference_w: 3.2 }),
     },
     services: {},
     language: "en",
@@ -130,7 +130,7 @@ describe("the house view", () => {
     const line = container.querySelectorAll("section.house-panel")[1]!.querySelector(".house-fed-from");
     expect(line?.textContent).toContain("feed-through lugs of");
     expect(line?.textContent).toContain("SPAN MAIN 40");
-    expect(line?.textContent).toMatch(/Sent\s*412.*Received\s*405.*Difference\s*7/s);
+    expect(line?.textContent).toMatch(/Sent\s*412.*Received\s*405.*Difference\s*7.*1-min average\s*3\.2/s);
   });
 
   it("starts each panel's grid at its first space, with no main-breaker rows", async () => {

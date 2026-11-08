@@ -203,10 +203,13 @@ export class HouseTab {
       const difference = readNumber(state);
       const upstreamW = Number(state?.attributes?.upstream_w);
       const panelW = Number(state?.attributes?.this_panel_w);
+      // Present when the integration matched the two panels by SPAN's frame time.
+      const averageW = Number(state?.attributes?.average_difference_w ?? Number.NaN);
       const parts = [
         Number.isFinite(upstreamW) ? `${t("house.check_upstream")} ${formatPowerHTML(upstreamW)}` : null,
         Number.isFinite(panelW) ? `${t("house.check_panel")} ${formatPowerHTML(panelW)}` : null,
         `${t("house.check_difference")} ${formatPowerHTML(difference)}`,
+        Number.isFinite(averageW) ? `${t("house.check_average")} ${formatPowerHTML(averageW)}` : null,
       ];
       el.innerHTML = parts.filter(Boolean).join(" · ");
     }
