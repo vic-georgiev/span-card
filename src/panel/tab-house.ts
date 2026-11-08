@@ -59,6 +59,7 @@ const HOUSE_STYLES = `
   }
   .house-summary .house-title { font-size: 1.4em; font-weight: 600; }
   .house-summary .house-power { font-size: 1.4em; }
+  .house-summary .house-sync { color: var(--secondary-text-color); font-size: 0.9em; }
   .house-panel + .house-panel { margin-top: 28px; }
   .house-panel.fed { border-left: 3px solid var(--divider-color); padding-left: 16px; }
   .house-fed-from {
@@ -131,6 +132,7 @@ export class HouseTab {
       <div class="house-summary">
         <span class="house-title">${escapeHtml(t("house.title"))}</span>
         <span class="house-power" data-house-power></span>
+        <span class="house-sync" data-house-sync></span>
       </div>
     `;
 
@@ -193,6 +195,16 @@ export class HouseTab {
     const total = sumReadings(house.house_power_entities.map(entityId => readNumber(hass.states[entityId])));
     const houseEl = container.querySelector("[data-house-power]");
     if (houseEl) houseEl.innerHTML = total.partial ? formatPowerHTML(null) : formatPowerHTML(total.total);
+
+    // How far behind live the panels are shown, so that they are shown at one
+    // instant: the integration's house clock, reported on any feed check.
+    const syncEl = container.querySelector("[data-house-sync]");
+    if (syncEl) {
+      const lags = house.panels
+        .map(panel => (panel.feed_check ? Number(hass.states[panel.feed_check]?.attributes?.house_clock_lag_s) : Number.NaN))
+        .filter(Number.isFinite);
+      syncEl.textContent = lags.length > 0 ? tf("house.synced", { lag: Math.max(0, lags[0]!).toFixed(1) }) : "";
+    }
 
     for (const el of container.querySelectorAll<HTMLElement>("[data-power-entity]")) {
       el.innerHTML = formatPowerHTML(readNumber(hass.states[el.dataset.powerEntity ?? ""]));

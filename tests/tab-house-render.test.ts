@@ -73,7 +73,12 @@ function hass(): HomeAssistant {
       "sensor.main_40_power": state("sensor.main_40_power", "3000"),
       "sensor.main_16_power": state("sensor.main_16_power", "405"),
       "sensor.main_40_feedthrough_power": state("sensor.main_40_feedthrough_power", "412"),
-      "sensor.main_16_feed_check": state("sensor.main_16_feed_check", "7", { upstream_w: 412, this_panel_w: 405, average_difference_w: 3.2 }),
+      "sensor.main_16_feed_check": state("sensor.main_16_feed_check", "7", {
+        upstream_w: 412,
+        this_panel_w: 405,
+        average_difference_w: 3.2,
+        house_clock_lag_s: 0.42,
+      }),
     },
     services: {},
     language: "en",
@@ -105,6 +110,11 @@ describe("the house view", () => {
   it("shows what the house draws, counting the fed panel once", async () => {
     const container = await render();
     expect(container.querySelector("[data-house-power]")?.textContent).toMatch(/3(\.0)?\s*kW|3000\s*W/);
+  });
+
+  it("says the panels are shown in sync, and how far behind live", async () => {
+    const container = await render();
+    expect(container.querySelector("[data-house-sync]")?.textContent).toBe("Panels in sync · 0.4 s behind live");
   });
 
   it("draws every panel in one view, upstream first", async () => {
