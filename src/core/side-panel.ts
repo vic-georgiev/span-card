@@ -240,17 +240,17 @@ const STYLES = `
   input.circuit-name {
     flex: 1;
     min-width: 0;
-    padding: 4px 6px;
+    padding: 6px 8px;
     margin-right: 8px;
-    border: 1px solid transparent;
+    border: 1px solid var(--divider-color, #e0e0e0);
     border-radius: 4px;
-    background: transparent;
+    background: var(--card-background-color, #fff);
     color: var(--primary-text-color, #212121);
     font: inherit;
     font-size: 14px;
   }
   input.circuit-name:hover {
-    border-color: var(--divider-color, #e0e0e0);
+    border-color: var(--secondary-text-color, #727272);
   }
   input.circuit-name:focus {
     outline: none;
@@ -1710,7 +1710,8 @@ class SpanSidePanel extends HTMLElement {
       busy = true;
       input.classList.remove("saved", "failed");
       input.classList.add("saving");
-      input.title = "";
+      input.disabled = true;
+      input.title = t("sidepanel.rename_waiting");
       try {
         const result = await this._renameCircuit(deviceId, uuid, wanted);
         saved = result?.name ?? wanted;
@@ -1720,11 +1721,15 @@ class SpanSidePanel extends HTMLElement {
       } catch (err) {
         input.value = saved;
         input.classList.add("failed");
-        input.title = t("sidepanel.rename_failed").replace("{error}", errorText(err));
+        const message = t("sidepanel.rename_failed").replace("{error}", errorText(err));
+        input.title = message;
         console.warn("SPAN Panel: rename failed:", errorText(err));
+        this.errorStore?.add({ key: "service:rename", level: "error", message, persistent: false });
       } finally {
         busy = false;
+        input.disabled = false;
         input.classList.remove("saving");
+        if (input.classList.contains("saved")) input.title = "";
       }
     };
 
