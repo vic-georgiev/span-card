@@ -140,7 +140,7 @@ describe("the house view", () => {
     const line = container.querySelectorAll("section.house-panel")[1]!.querySelector(".house-fed-from");
     expect(line?.textContent).toContain("feed-through lugs of");
     expect(line?.textContent).toContain("SPAN MAIN 40");
-    expect(line?.textContent).toMatch(/Sent\s*412.*Received\s*405.*Difference\s*7.*1-min average\s*3\.2/s);
+    expect(line?.textContent).toMatch(/At the lugs\s*412.*At this panel\s*405.*Difference\s*7.*1-min average\s*3\.2/s);
   });
 
   it("starts each panel's grid at its first space, with no main-breaker rows", async () => {
