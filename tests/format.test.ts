@@ -8,26 +8,26 @@ describe("formatPowerUnit", () => {
     expect(formatPowerUnit(999)).toBe("W");
   });
 
-  it("stays in W for values >= 1000", () => {
-    expect(formatPowerUnit(1000)).toBe("W");
-    expect(formatPowerUnit(11500)).toBe("W");
+  it("returns kW for values >= 1000", () => {
+    expect(formatPowerUnit(1000)).toBe("kW");
+    expect(formatPowerUnit(11500)).toBe("kW");
   });
 
   it("handles negative values", () => {
     expect(formatPowerUnit(-500)).toBe("W");
-    expect(formatPowerUnit(-1000)).toBe("W");
+    expect(formatPowerUnit(-1000)).toBe("kW");
   });
 });
 
 describe("formatPowerSigned", () => {
   it("formats positive values without sign", () => {
     expect(formatPowerSigned(500)).toBe("500");
-    expect(formatPowerSigned(1500)).toBe("1,500");
+    expect(formatPowerSigned(1500)).toBe("1.50");
   });
 
   it("formats negative values with minus sign", () => {
     expect(formatPowerSigned(-500)).toBe("-500");
-    expect(formatPowerSigned(-1500)).toBe("-1,500");
+    expect(formatPowerSigned(-1500)).toBe("-1.50");
   });
 
   it("formats zero", () => {
@@ -40,9 +40,9 @@ describe("formatPowerSigned", () => {
 });
 
 describe("formatWatts", () => {
-  it("shows whole watts with thousands separators", () => {
+  it("shows whole watts below 1 kW and kW with two decimals from there", () => {
     expect(formatWatts(728)).toBe("728");
-    expect(formatWatts(2345.4)).toBe("2,345");
+    expect(formatWatts(1234)).toBe("1.23");
   });
 
   it("keeps one decimal below 10 W, so a 1 W load is visible", () => {
@@ -50,7 +50,7 @@ describe("formatWatts", () => {
   });
 
   it("handles negative values using absolute value", () => {
-    expect(formatWatts(-1500)).toBe("1,500");
+    expect(formatWatts(-1500)).toBe("1.50");
   });
 
   it("handles zero", () => {
@@ -60,7 +60,7 @@ describe("formatWatts", () => {
 
 describe("formatPowerHTML", () => {
   it("draws a reading with its unit", () => {
-    expect(formatPowerHTML(1500)).toBe('<strong>1,500</strong> <span class="power-unit">W</span>');
+    expect(formatPowerHTML(1500)).toBe('<strong>1.50</strong> <span class="power-unit">kW</span>');
     expect(formatPowerHTML(0)).toBe('<strong>0</strong> <span class="power-unit">W</span>');
   });
 

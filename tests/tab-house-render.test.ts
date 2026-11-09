@@ -109,7 +109,7 @@ describe("the house view", () => {
 
   it("shows what the house draws, counting the fed panel once", async () => {
     const container = await render();
-    expect(container.querySelector("[data-house-power]")?.textContent).toMatch(/3,000\s*W/);
+    expect(container.querySelector("[data-house-power]")?.textContent).toMatch(/3\.00\s*kW/);
   });
 
   it("says the panels are shown in sync, and how far behind live", async () => {

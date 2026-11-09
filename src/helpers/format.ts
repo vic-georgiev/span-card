@@ -35,7 +35,7 @@ export function formatCircuitCurrentHTML(amps: number | null): string {
   return `<strong>${currentMetric.format(amps)}</strong><span class="power-unit">A</span>`;
 }
 
-/** A header reading in watts, unsigned, as the power metric formats it. */
+/** A header reading, unsigned, as the power metric formats it (W, or kW from 1 kW). */
 export function formatWatts(watts: number): string {
   return powerMetric.format(watts);
 }
