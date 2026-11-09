@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatPowerUnit, formatPowerSigned, formatKw, formatPowerHTML, formatCircuitPowerHTML, formatCircuitCurrentHTML } from "../src/helpers/format.js";
+import { formatPowerUnit, formatPowerSigned, formatWatts, formatPowerHTML, formatCircuitPowerHTML, formatCircuitCurrentHTML } from "../src/helpers/format.js";
 
 describe("formatPowerUnit", () => {
   it("returns W for values under 1000", () => {
@@ -8,26 +8,26 @@ describe("formatPowerUnit", () => {
     expect(formatPowerUnit(999)).toBe("W");
   });
 
-  it("returns kW for values >= 1000", () => {
-    expect(formatPowerUnit(1000)).toBe("kW");
-    expect(formatPowerUnit(5000)).toBe("kW");
+  it("stays in W for values >= 1000", () => {
+    expect(formatPowerUnit(1000)).toBe("W");
+    expect(formatPowerUnit(11500)).toBe("W");
   });
 
   it("handles negative values", () => {
     expect(formatPowerUnit(-500)).toBe("W");
-    expect(formatPowerUnit(-1000)).toBe("kW");
+    expect(formatPowerUnit(-1000)).toBe("W");
   });
 });
 
 describe("formatPowerSigned", () => {
   it("formats positive values without sign", () => {
     expect(formatPowerSigned(500)).toBe("500");
-    expect(formatPowerSigned(1500)).toBe("1.5");
+    expect(formatPowerSigned(1500)).toBe("1,500");
   });
 
   it("formats negative values with minus sign", () => {
     expect(formatPowerSigned(-500)).toBe("-500");
-    expect(formatPowerSigned(-1500)).toBe("-1.5");
+    expect(formatPowerSigned(-1500)).toBe("-1,500");
   });
 
   it("formats zero", () => {
@@ -39,25 +39,28 @@ describe("formatPowerSigned", () => {
   });
 });
 
-describe("formatKw", () => {
-  it("converts watts to kW with one decimal", () => {
-    expect(formatKw(1000)).toBe("1.0");
-    expect(formatKw(1500)).toBe("1.5");
-    expect(formatKw(2345)).toBe("2.3");
+describe("formatWatts", () => {
+  it("shows whole watts with thousands separators", () => {
+    expect(formatWatts(728)).toBe("728");
+    expect(formatWatts(2345.4)).toBe("2,345");
+  });
+
+  it("keeps one decimal below 10 W, so a 1 W load is visible", () => {
+    expect(formatWatts(1)).toBe("1.0");
   });
 
   it("handles negative values using absolute value", () => {
-    expect(formatKw(-1500)).toBe("1.5");
+    expect(formatWatts(-1500)).toBe("1,500");
   });
 
   it("handles zero", () => {
-    expect(formatKw(0)).toBe("0.0");
+    expect(formatWatts(0)).toBe("0");
   });
 });
 
 describe("formatPowerHTML", () => {
   it("draws a reading with its unit", () => {
-    expect(formatPowerHTML(1500)).toBe('<strong>1.5</strong> <span class="power-unit">kW</span>');
+    expect(formatPowerHTML(1500)).toBe('<strong>1,500</strong> <span class="power-unit">W</span>');
     expect(formatPowerHTML(0)).toBe('<strong>0</strong> <span class="power-unit">W</span>');
   });
 

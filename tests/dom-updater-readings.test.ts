@@ -73,7 +73,7 @@ describe("the header's readings", () => {
     updateCircuitDOM(root, hass, topology(), CONFIG, new Map(), undefined);
 
     for (const name of ["consumption", "upstream", "downstream", "solar"]) {
-      expect(stat(root, name).textContent).toBe("0.0");
+      expect(stat(root, name).textContent).toBe("0");
     }
     expect(stat(root, "battery").textContent).toBe("0");
   });
@@ -84,7 +84,7 @@ describe("the header's readings", () => {
 
     updateCircuitDOM(root, hass, topology(), CONFIG, new Map(), undefined);
 
-    expect(stat(root, "consumption").textContent).toBe("1.5");
+    expect(stat(root, "consumption").textContent).toBe("1,500");
     expect(stat(root, "consumption").classList.contains("stat-partial")).toBe(true);
   });
 
@@ -94,7 +94,7 @@ describe("the header's readings", () => {
 
     updateCircuitDOM(root, hassWith({ "sensor.a_power": "1000", "sensor.b_power": "500", "sensor.c_power": "0" }), topology(), CONFIG, new Map(), undefined);
 
-    expect(stat(root, "consumption").textContent).toBe("1.5");
+    expect(stat(root, "consumption").textContent).toBe("1,500");
     expect(stat(root, "consumption").classList.contains("stat-partial")).toBe(false);
   });
 

@@ -61,12 +61,13 @@ export const CHART_METRICS: Record<string, ChartMetricDef> = {
   power: {
     entityRole: "power",
     label: () => t("metric.power"),
-    unit: (v: number) => (Math.abs(v) >= 1000 ? "kW" : "W"),
+    // Always watts: a 1 W load reads 1 W, never 0.001 kW, and 1,234 W keeps
+    // the detail that 1.2 kW rounds away.
+    unit: () => "W",
     format: (v: number) => {
       const abs = Math.abs(v);
-      if (abs >= 1000) return (abs / 1000).toFixed(1);
       if (abs < 10 && abs > 0) return abs.toFixed(1);
-      return String(Math.round(abs));
+      return Math.round(abs).toLocaleString("en-US");
     },
   },
   current: {

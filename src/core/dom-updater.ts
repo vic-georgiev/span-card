@@ -6,7 +6,7 @@ import {
   BESS_CHART_COL_HEIGHT,
   EVSE_CHART_HEIGHT,
 } from "../constants.js";
-import { formatCircuitCurrentHTML, formatCircuitPowerHTML, formatPowerHTML, formatKw, UNKNOWN_READING } from "../helpers/format.js";
+import { formatCircuitCurrentHTML, formatCircuitPowerHTML, formatPowerHTML, formatWatts, UNKNOWN_READING } from "../helpers/format.js";
 import { readNumber, sumReadings, type ReadingSum } from "../helpers/read-number.js";
 import { getChartMetric } from "../helpers/chart.js";
 import { resolveSubDevicePower, stateWatts } from "../helpers/sub-device-power.js";
@@ -19,9 +19,9 @@ import type { HomeAssistant, PanelTopology, CardConfig, HistoryMap, ChartMetricD
 
 // ── Header stats ───────────────────────────────────────────────────────────
 
-/** A header reading in kW, or the unknown mark. */
-function formatKwReading(watts: number | null): string {
-  return watts === null ? UNKNOWN_READING : formatKw(watts);
+/** A header reading in watts, or the unknown mark. */
+function formatWattsReading(watts: number | null): string {
+  return watts === null ? UNKNOWN_READING : formatWatts(watts);
 }
 
 /**
@@ -59,10 +59,10 @@ export function updatePanelStatsBlock(
     const siteState = siteEid ? hass.states[siteEid] : undefined;
     if (siteState) site = { total: readNumber(siteState), partial: false };
     if (consumptionEl) {
-      consumptionEl.textContent = formatKwReading(site?.total ?? null);
+      consumptionEl.textContent = formatWattsReading(site?.total ?? null);
       consumptionEl.classList.toggle("stat-partial", site?.partial ?? false);
     }
-    if (consumptionUnitEl) consumptionUnitEl.textContent = "kW";
+    if (consumptionUnitEl) consumptionUnitEl.textContent = "W";
   }
 
   // Upstream stat
@@ -76,8 +76,8 @@ export function updatePanelStatsBlock(
       upstreamEl.textContent = Number.isFinite(amps) ? Math.abs(amps).toFixed(1) : UNKNOWN_READING;
       if (upstreamUnitEl) upstreamUnitEl.textContent = "A";
     } else {
-      upstreamEl.textContent = formatKwReading(readNumber(upState));
-      if (upstreamUnitEl) upstreamUnitEl.textContent = "kW";
+      upstreamEl.textContent = formatWattsReading(readNumber(upState));
+      if (upstreamUnitEl) upstreamUnitEl.textContent = "W";
     }
   }
 
@@ -92,8 +92,8 @@ export function updatePanelStatsBlock(
       downstreamEl.textContent = Number.isFinite(amps) ? Math.abs(amps).toFixed(1) : UNKNOWN_READING;
       if (downstreamUnitEl) downstreamUnitEl.textContent = "A";
     } else {
-      downstreamEl.textContent = formatKwReading(readNumber(downState));
-      if (downstreamUnitEl) downstreamUnitEl.textContent = "kW";
+      downstreamEl.textContent = formatWattsReading(readNumber(downState));
+      if (downstreamUnitEl) downstreamUnitEl.textContent = "W";
     }
   }
 
@@ -108,8 +108,8 @@ export function updatePanelStatsBlock(
       solarEl.textContent = Number.isFinite(amps) ? Math.abs(amps).toFixed(1) : UNKNOWN_READING;
       if (solarUnitEl) solarUnitEl.textContent = "A";
     } else {
-      solarEl.textContent = formatKwReading(readNumber(solarState));
-      if (solarUnitEl) solarUnitEl.textContent = "kW";
+      solarEl.textContent = formatWattsReading(readNumber(solarState));
+      if (solarUnitEl) solarUnitEl.textContent = "W";
     }
   }
 

@@ -73,7 +73,7 @@ export function buildPanelStatsHTML(topology: PanelTopology, config: CardConfig,
         <span class="stat-label">${t("header.site")}</span>
         <div class="stat-row">
           <span class="stat-value">${UNKNOWN_READING}</span>
-          <span class="stat-unit">${isAmpsMode ? "A" : "kW"}</span>
+          <span class="stat-unit">${isAmpsMode ? "A" : "W"}</span>
         </div>
       </div>`
           : ""
@@ -96,7 +96,7 @@ export function buildPanelStatsHTML(topology: PanelTopology, config: CardConfig,
         <span class="stat-label">${t("header.upstream")}</span>
         <div class="stat-row">
           <span class="stat-value">${UNKNOWN_READING}</span>
-          <span class="stat-unit">${isAmpsMode ? "A" : "kW"}</span>
+          <span class="stat-unit">${isAmpsMode ? "A" : "W"}</span>
         </div>
       </div>`
           : ""
@@ -108,7 +108,7 @@ export function buildPanelStatsHTML(topology: PanelTopology, config: CardConfig,
         <span class="stat-label">${t("header.downstream")}</span>
         <div class="stat-row">
           <span class="stat-value">${UNKNOWN_READING}</span>
-          <span class="stat-unit">${isAmpsMode ? "A" : "kW"}</span>
+          <span class="stat-unit">${isAmpsMode ? "A" : "W"}</span>
         </div>
       </div>`
           : ""
@@ -120,7 +120,7 @@ export function buildPanelStatsHTML(topology: PanelTopology, config: CardConfig,
         <span class="stat-label">${t("header.solar")}</span>
         <div class="stat-row">
           <span class="stat-value">${UNKNOWN_READING}</span>
-          <span class="stat-unit">${isAmpsMode ? "A" : "kW"}</span>
+          <span class="stat-unit">${isAmpsMode ? "A" : "W"}</span>
         </div>
       </div>`
           : ""
