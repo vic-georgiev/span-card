@@ -1,3 +1,4 @@
+import { renameDeviceFor } from "../helpers/circuit-rename.js";
 import { DEFAULT_GRAPH_HORIZON, GRAPH_HORIZONS, INTEGRATION_DOMAIN, LIVE_SAMPLE_INTERVAL_MS } from "../constants.js";
 import { getCircuitChartEntity } from "../helpers/chart.js";
 import { getHorizonDurationMs, getMaxHistoryPoints, getMinGapMs, recordSample } from "../helpers/history.js";
@@ -512,6 +513,8 @@ export class DashboardController {
           favoritePanelDeviceId,
           isFavorite,
           configEntryId: entryId,
+          // Renaming addresses this panel's device; a favorite may be another panel's.
+          renameDeviceId: ref ? undefined : renameDeviceFor(this._topology),
         };
         sidePanel.open(circuitConfig);
         return;

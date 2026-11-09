@@ -1,5 +1,7 @@
 // src/core/side-panel.ts
 import { escapeHtml } from "../helpers/sanitize.js";
+import { errorText } from "../helpers/error-text.js";
+import { MAX_CIRCUIT_NAME_LENGTH, renameDeviceFor } from "../helpers/circuit-rename.js";
 import { loadListColumns, saveListColumns } from "../helpers/list-columns.js";
 import { INTEGRATION_DOMAIN, SHEDDING_PRIORITIES, SELECTABLE_PRIORITY_KEYS, GRAPH_HORIZONS, DEFAULT_GRAPH_HORIZON, INPUT_DEBOUNCE_MS } from "../constants.js";
 import { t } from "../i18n.js";
@@ -67,6 +69,8 @@ export type CircuitModeConfig = CircuitControlFields & {
   isFavorite?: boolean;
   /** Route domain service calls to this config entry (favorites view). */
   configEntryId?: string | null;
+  /** The panel's device id when its circuits can be renamed from here; unset otherwise. */
+  renameDeviceId?: string;
 };
 
 interface SubDeviceModeConfig {
@@ -231,6 +235,41 @@ const STYLES = `
   }
   input[type="number"]:disabled {
     opacity: 0.5;
+  }
+
+  input.circuit-name {
+    flex: 1;
+    min-width: 0;
+    padding: 4px 6px;
+    margin-right: 8px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--primary-text-color, #212121);
+    font: inherit;
+    font-size: 14px;
+  }
+  input.circuit-name:hover {
+    border-color: var(--divider-color, #e0e0e0);
+  }
+  input.circuit-name:focus {
+    outline: none;
+    border-color: var(--primary-color, #03a9f4);
+    background: var(--card-background-color, #fff);
+  }
+  input.circuit-name.saving {
+    opacity: 0.6;
+  }
+  input.circuit-name.saved {
+    border-color: var(--success-color, #4caf50);
+  }
+  input.circuit-name.failed {
+    border-color: var(--error-color, #db4437);
+  }
+  .section-hint {
+    font-size: 12px;
+    color: var(--secondary-text-color, #727272);
+    margin: -4px 0 8px 0;
   }
 
   .radio-group {
@@ -530,6 +569,14 @@ class SpanSidePanel extends HTMLElement {
       circuitLabel.textContent = t("sidepanel.circuit_scales");
       circuitSection.appendChild(circuitLabel);
 
+      const renameDeviceId = renameDeviceFor(topology);
+      if (renameDeviceId) {
+        const hint = document.createElement("div");
+        hint.className = "section-hint";
+        hint.textContent = t("sidepanel.rename_hint");
+        circuitSection.appendChild(hint);
+      }
+
       const circuits = Object.entries(topology.circuits).sort(([, a], [, b]) => (a.name || "").localeCompare(b.name || ""));
 
       for (const [uuid, circuit] of circuits) {
@@ -541,7 +588,8 @@ class SpanSidePanel extends HTMLElement {
           cfg.configEntryId ?? null,
           cfg.showFavorites ?? false,
           cfg.favoritePanelDeviceId,
-          cfg.favoriteCircuitUuids
+          cfg.favoriteCircuitUuids,
+          renameDeviceId
         );
         circuitSection.appendChild(row);
       }
@@ -680,16 +728,25 @@ class SpanSidePanel extends HTMLElement {
     configEntryId: string | null,
     showFavorites: boolean,
     favoritePanelDeviceId: string | undefined,
-    favoriteCircuitUuids: Set<string> | undefined
+    favoriteCircuitUuids: Set<string> | undefined,
+    renameDeviceId?: string
   ): HTMLDivElement {
     const row = document.createElement("div");
     row.className = "field-row";
 
-    const nameLabel = document.createElement("span");
-    nameLabel.className = "field-label";
-    nameLabel.textContent = circuit.name || uuid;
-    nameLabel.style.cssText = "overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1;";
-    row.appendChild(nameLabel);
+    if (renameDeviceId) {
+      row.appendChild(
+        this._buildNameInput(renameDeviceId, uuid, circuit.name || "", name => {
+          circuit.name = name;
+        })
+      );
+    } else {
+      const nameLabel = document.createElement("span");
+      nameLabel.className = "field-label";
+      nameLabel.textContent = circuit.name || uuid;
+      nameLabel.style.cssText = "overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1;";
+      row.appendChild(nameLabel);
+    }
 
     if (showFavorites && favoritePanelDeviceId) {
       const heart = this._buildFavoriteHeart(circuit.entities, favoriteCircuitUuids?.has(uuid) ?? false);
@@ -838,6 +895,26 @@ class SpanSidePanel extends HTMLElement {
     const body = document.createElement("div");
     body.className = "panel-body";
     panel.appendChild(body);
+
+    if (cfg.renameDeviceId) {
+      const section = document.createElement("div");
+      section.className = "section";
+      const label = document.createElement("div");
+      label.className = "section-label";
+      label.textContent = t("sidepanel.circuit_name");
+      section.appendChild(label);
+      const row = document.createElement("div");
+      row.className = "field-row";
+      const titleEl = header.querySelector<HTMLElement>(".title");
+      row.appendChild(
+        this._buildNameInput(cfg.renameDeviceId, cfg.uuid, cfg.name, name => {
+          cfg.name = name;
+          if (titleEl) titleEl.textContent = name;
+        })
+      );
+      section.appendChild(row);
+      body.appendChild(section);
+    }
 
     this._renderRelaySection(body, cfg);
     if (cfg.showFavorites) {
@@ -1600,6 +1677,81 @@ class SpanSidePanel extends HTMLElement {
     if (SELECTABLE_PRIORITY_KEYS.includes(key)) selectEl.value = key;
     else selectEl.selectedIndex = -1;
     selectEl.disabled = !selectOperable(cfg, this._hass);
+  }
+
+  // ── Circuit names ───────────────────────────────────────────────────
+
+  /**
+   * A text field that renames the circuit on the panel itself. Enter or leaving
+   * the field saves; Escape puts the old name back. The tiles and entities
+   * follow once the integration reloads with the panel's new description.
+   */
+  private _buildNameInput(deviceId: string, uuid: string, current: string, onRenamed: (name: string) => void): HTMLInputElement {
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "circuit-name";
+    input.value = current;
+    input.maxLength = MAX_CIRCUIT_NAME_LENGTH;
+    input.dataset.uuid = uuid;
+    input.setAttribute("aria-label", t("sidepanel.circuit_name"));
+    let saved = current;
+    let busy = false;
+
+    const save = async (): Promise<void> => {
+      const wanted = input.value.trim().replace(/\s+/g, " ");
+      if (busy || wanted === saved) {
+        input.value = saved;
+        return;
+      }
+      if (!wanted) {
+        input.value = saved;
+        return;
+      }
+      busy = true;
+      input.classList.remove("saved", "failed");
+      input.classList.add("saving");
+      input.title = "";
+      try {
+        const result = await this._renameCircuit(deviceId, uuid, wanted);
+        saved = result?.name ?? wanted;
+        input.value = saved;
+        input.classList.add("saved");
+        onRenamed(saved);
+      } catch (err) {
+        input.value = saved;
+        input.classList.add("failed");
+        input.title = t("sidepanel.rename_failed").replace("{error}", errorText(err));
+        console.warn("SPAN Panel: rename failed:", errorText(err));
+      } finally {
+        busy = false;
+        input.classList.remove("saving");
+      }
+    };
+
+    input.addEventListener("keydown", (ev: KeyboardEvent) => {
+      if (ev.key === "Enter") {
+        ev.preventDefault();
+        input.blur();
+      } else if (ev.key === "Escape") {
+        ev.preventDefault();
+        ev.stopPropagation();
+        input.value = saved;
+        input.blur();
+      }
+    });
+    input.addEventListener("input", () => input.classList.remove("saved", "failed"));
+    input.addEventListener("change", () => void save());
+    return input;
+  }
+
+  private _renameCircuit(deviceId: string, circuitId: string, name: string): Promise<{ name: string } | undefined> {
+    if (!this._hass) return Promise.resolve(undefined);
+    return this._hass.callWS<{ name: string }>({
+      type: `${INTEGRATION_DOMAIN}/rename_circuit`,
+      device_id: deviceId,
+      circuit_id: circuitId,
+      name,
+    });
   }
 
   // ── Service calls ───────────────────────────────────────────────────

@@ -108,6 +108,8 @@ export interface PanelTopology {
    * breakers, so the grid starts below them. Absent from older integrations.
    */
   first_space?: number;
+  /** Whether `span_panel/rename_circuit` can write names on this panel. Absent from older integrations. */
+  can_rename?: boolean;
   /** The device id the request carried, echoed as sent. */
   device_id?: string;
   /**
