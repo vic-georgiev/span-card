@@ -2,6 +2,7 @@
 import { escapeHtml } from "../helpers/sanitize.js";
 import { errorText } from "../helpers/error-text.js";
 import { MAX_CIRCUIT_NAME_LENGTH, renameDeviceFor } from "../helpers/circuit-rename.js";
+import { HISTORY_RESOLUTIONS, dateInputValue, downloadExport, exportRange, requestHistoryExport, type HistoryResolution } from "../helpers/history-export.js";
 import { loadListColumns, saveListColumns } from "../helpers/list-columns.js";
 import { INTEGRATION_DOMAIN, SHEDDING_PRIORITIES, SELECTABLE_PRIORITY_KEYS, GRAPH_HORIZONS, DEFAULT_GRAPH_HORIZON, INPUT_DEBOUNCE_MS } from "../constants.js";
 import { t } from "../i18n.js";
@@ -558,6 +559,8 @@ class SpanSidePanel extends HTMLElement {
     globalRow.appendChild(globalSelect);
     globalSection.appendChild(globalRow);
     body.appendChild(globalSection);
+
+    if (topology?.can_export_history) body.appendChild(this._buildHistoryExportSection(cfg.configEntryId ?? null));
 
     // ── Per-circuit horizon scales ──
     if (topology?.circuits) {
@@ -1677,6 +1680,97 @@ class SpanSidePanel extends HTMLElement {
     if (SELECTABLE_PRIORITY_KEYS.includes(key)) selectEl.value = key;
     else selectEl.selectedIndex = -1;
     selectEl.disabled = !selectOperable(cfg, this._hass);
+  }
+
+  // ── History export ──────────────────────────────────────────────────
+
+  /** A date range, a resolution and a button that downloads SPAN's energy history as CSV. */
+  private _buildHistoryExportSection(configEntryId: string | null): HTMLDivElement {
+    const section = document.createElement("div");
+    section.className = "section history-export";
+    const label = document.createElement("div");
+    label.className = "section-label";
+    label.textContent = t("sidepanel.export_history");
+    section.appendChild(label);
+
+    const today = new Date();
+    const field = (labelKey: string, control: HTMLElement): void => {
+      const row = document.createElement("div");
+      row.className = "field-row";
+      const name = document.createElement("span");
+      name.className = "field-label";
+      name.textContent = t(labelKey);
+      row.appendChild(name);
+      row.appendChild(control);
+      section.appendChild(row);
+    };
+    const dateInput = (value: Date, name: string): HTMLInputElement => {
+      const input = document.createElement("input");
+      input.type = "date";
+      input.className = `export-${name}`;
+      input.value = dateInputValue(value);
+      input.max = dateInputValue(today);
+      return input;
+    };
+    const from = dateInput(new Date(today.getFullYear(), today.getMonth(), 1), "from");
+    const to = dateInput(today, "to");
+    const resolution = document.createElement("select");
+    resolution.className = "export-resolution";
+    for (const key of HISTORY_RESOLUTIONS) {
+      const opt = document.createElement("option");
+      opt.value = key;
+      opt.textContent = t(`sidepanel.export_resolution_${key}`);
+      resolution.appendChild(opt);
+    }
+    resolution.value = "hour";
+    field("sidepanel.export_from", from);
+    field("sidepanel.export_to", to);
+    field("sidepanel.export_resolution", resolution);
+
+    const row = document.createElement("div");
+    row.className = "field-row";
+    const status = document.createElement("span");
+    status.className = "field-label export-status";
+    const button = document.createElement("button");
+    button.className = "export-button";
+    button.textContent = t("sidepanel.export_download");
+    Object.assign(button.style, {
+      background: "var(--primary-color, #03a9f4)",
+      color: "var(--text-primary-color, #fff)",
+      border: "none",
+      borderRadius: "4px",
+      padding: "6px 12px",
+      cursor: "pointer",
+      font: "inherit",
+    });
+    button.addEventListener("click", () => {
+      const range = exportRange(from.value, to.value);
+      if (!range || !this._hass) {
+        status.textContent = t("sidepanel.export_bad_range");
+        return;
+      }
+      button.disabled = true;
+      status.textContent = t("sidepanel.export_working");
+      requestHistoryExport(this._hass, range, resolution.value as HistoryResolution, configEntryId)
+        .then(exports => {
+          for (const item of exports) downloadExport(item);
+          const rows = exports.reduce((sum, item) => sum + item.rows, 0);
+          status.textContent = t("sidepanel.export_done").replace("{rows}", String(rows));
+        })
+        .catch((err: unknown) => {
+          const message = t("sidepanel.export_failed").replace("{error}", errorText(err));
+          status.textContent = message;
+          console.warn("SPAN Panel: history export failed:", errorText(err));
+          this.errorStore?.add({ key: "service:export_history", level: "error", message, persistent: false });
+        })
+        .finally(() => {
+          button.disabled = false;
+        });
+    });
+    row.appendChild(status);
+    row.appendChild(button);
+    section.appendChild(row);
+    return section;
   }
 
   // ── Circuit names ───────────────────────────────────────────────────

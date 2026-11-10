@@ -110,6 +110,8 @@ export interface PanelTopology {
   first_space?: number;
   /** Whether `span_panel/rename_circuit` can write names on this panel. Absent from older integrations. */
   can_rename?: boolean;
+  /** Whether `span_panel/export_history` can read this panel's history from SPAN. */
+  can_export_history?: boolean;
   /** The device id the request carried, echoed as sent. */
   device_id?: string;
   /**
