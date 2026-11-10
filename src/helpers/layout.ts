@@ -1,4 +1,62 @@
-import type { DualTabLayout } from "../types.js";
+import type { Circuit, DualTabLayout, PanelTopology } from "../types.js";
+
+/**
+ * Whether a size or position the topology reports can be laid out. A panel that
+ * does not know its size reports 0, and anything that is not a whole number above
+ * zero is no size at all.
+ */
+export function isPositiveInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+
+/** Whether the circuit is a meter outside the panel, occupying no breaker space, rather than a breaker in it. */
+export function measuresOutsidePanel(c: Pick<Circuit, "outside_panel">): boolean {
+  return c.outside_panel === true;
+}
+
+/** The first and last breaker positions the grid draws, inclusive. */
+export interface PositionRange {
+  readonly first: number;
+  readonly last: number;
+}
+
+/**
+ * The breaker positions the grid draws: the range the panel reports, else 1 to
+ * `panelSize`, widened to every tab a breaker occupies so that no breaker is
+ * dropped. A meter outside the panel occupies none. Null when nothing places
+ * a breaker.
+ */
+export function positionRange(topology: PanelTopology | null, panelSize: number): PositionRange | null {
+  if (!topology) return null;
+  let first: number | null = null;
+  let last: number | null = null;
+  const { first_position: reportedFirst, last_position: reportedLast } = topology;
+  if (isPositiveInteger(reportedFirst) && isPositiveInteger(reportedLast) && reportedFirst <= reportedLast) {
+    first = reportedFirst;
+    last = reportedLast;
+  } else if (isPositiveInteger(panelSize)) {
+    // An integration that names only the first space (a SPAN MAIN 40 or 16,
+    // whose spaces start at 9 below the main-breaker module) gets its spaces
+    // counted from there.
+    const firstSpace = topology.first_space;
+    first = isPositiveInteger(firstSpace) ? firstSpace : 1;
+    last = first + panelSize - 1;
+  }
+  for (const circuit of Object.values(topology.circuits)) {
+    if (!circuit || measuresOutsidePanel(circuit)) continue;
+    for (const tab of circuit.tabs ?? []) {
+      if (!isPositiveInteger(tab)) continue;
+      first = first === null ? tab : Math.min(first, tab);
+      last = last === null ? tab : Math.max(last, tab);
+    }
+  }
+  return first === null || last === null ? null : { first, last };
+}
+
+/** The grid rows a range spans: two positions to a row, odd on the left. */
+export function positionRowCount(positions: PositionRange): number {
+  return tabToRow(positions.last) - tabToRow(positions.first) + 1;
+}
 
 export function tabToRow(tab: number): number {
   return Math.ceil(tab / 2);

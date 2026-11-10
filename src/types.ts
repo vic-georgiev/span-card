@@ -48,6 +48,20 @@ export interface Circuit {
   always_on?: boolean;
   voltage?: number;
   area?: string;
+  /**
+   * A meter outside the panel: it occupies no breaker space and has no relay. Its
+   * power is import-positive, positive while power flows into the panel.
+   */
+  outside_panel?: boolean;
+  /**
+   * Whether the circuit is a source of generation: solar, by its device or by the
+   * role the panel reports for it. Absent from a topology that predates it.
+   */
+  is_generation?: boolean;
+  /** The group of circuits that share this circuit's meter, by its key; null when it shares none. */
+  shared_meter_group?: string | null;
+  /** The group of circuits that share this circuit's relay, by its key; null when it shares none. */
+  shared_relay_group?: string | null;
 }
 
 /**
@@ -75,6 +89,8 @@ export interface SubDeviceSolar {
   feed_circuit_id: string | null;
   power_entity_id: string | null;
   site_power_entity_id: string | null;
+  /** `role` where the source is a circuit that reports a solar role, with no inverter published behind it to identify. */
+  identity?: "role";
 }
 
 export interface SubDevice {
@@ -112,6 +128,12 @@ export interface PanelTopology {
   can_rename?: boolean;
   /** Whether `span_panel/export_history` can read this panel's history from SPAN. */
   can_export_history?: boolean;
+  /**
+   * The panel's first and last breaker positions, which need not start at 1. Null
+   * where the panel reports none; absent from an integration that predates them.
+   */
+  first_position?: number | null;
+  last_position?: number | null;
   /** The device id the request carried, echoed as sent. */
   device_id?: string;
   /**

@@ -1,4 +1,6 @@
 import { CHART_METRICS } from "../constants.js";
+import { readNumber } from "./read-number.js";
+import type { HassEntity } from "../types.js";
 
 const powerMetric = CHART_METRICS.power!;
 const currentMetric = CHART_METRICS.current!;
@@ -38,4 +40,18 @@ export function formatCircuitCurrentHTML(amps: number | null): string {
 /** A header reading, unsigned, as the power metric formats it (W, or kW from 1 kW). */
 export function formatWatts(watts: number): string {
   return powerMetric.format(watts);
+}
+
+/** An energy reading, Wh shown as kWh, or the unknown mark when there is none. */
+export function formatEnergyReading(state: HassEntity | undefined): string {
+  const value = readNumber(state);
+  if (value === null) return UNKNOWN_READING;
+  const unit = state?.attributes.unit_of_measurement;
+  if (unit === "Wh") return `${(value / 1000).toFixed(1)} kWh`;
+  if (unit === "kWh") return `${value.toFixed(1)} kWh`;
+  return typeof unit === "string" && unit ? `${value} ${unit}` : String(value);
+}
+
+export function formatKw(watts: number): string {
+  return (Math.abs(watts) / 1000).toFixed(1);
 }

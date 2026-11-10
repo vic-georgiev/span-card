@@ -1,4 +1,5 @@
 import { DEVICE_TYPE_PV, RELAY_STATE_CLOSED, SELECTABLE_PRIORITY_KEYS } from "../constants.js";
+import { measuresOutsidePanel } from "../helpers/layout.js";
 import { readNumber } from "../helpers/read-number.js";
 import { isAlertActive } from "./monitoring-status.js";
 import type { Circuit, HomeAssistant, MonitoringPointInfo } from "../types.js";
@@ -17,6 +18,14 @@ export function getCircuitStateClasses(_circuit: Circuit, monitoringInfo: Monito
   return classes.join(" ");
 }
 
+/**
+ * Whether a circuit is drawn and sorted as on: its relay is closed, or it is a
+ * meter outside the panel, which has no relay to open.
+ */
+export function drawsAsOn(c: CircuitControlFields & Pick<Circuit, "outside_panel">, hass: HomeAssistant): boolean {
+  return measuresOutsidePanel(c) || relayClosed(c, hass);
+}
+
 /** A circuit's power reading in watts, or null where its sensor has none. */
 export function circuitPowerW(c: Pick<Circuit, "entities">, hass: HomeAssistant): number | null {
   const entityId = c.entities?.power;
@@ -29,9 +38,17 @@ export function circuitCurrentA(c: Pick<Circuit, "entities">, hass: HomeAssistan
   return readNumber(entityId ? hass.states[entityId] : undefined);
 }
 
-/** Whether a circuit draws as production: a solar circuit, or one measured feeding power back. An unknown reading is not production. */
-export function readsAsProducer(c: Pick<Circuit, "device_type">, powerW: number | null): boolean {
-  return c.device_type === DEVICE_TYPE_PV || (powerW !== null && powerW < 0);
+/**
+ * Whether a circuit is a source of generation: as the topology flags it, else, for
+ * a topology that carries no flag, by its device type.
+ */
+export function isGeneration(c: Pick<Circuit, "device_type" | "is_generation">): boolean {
+  return c.is_generation ?? c.device_type === DEVICE_TYPE_PV;
+}
+
+/** Whether a circuit draws as production: a source of generation, or one measured feeding power back. An unknown reading is not production. */
+export function readsAsProducer(c: Pick<Circuit, "device_type" | "is_generation">, powerW: number | null): boolean {
+  return isGeneration(c) || (powerW !== null && powerW < 0);
 }
 
 /**

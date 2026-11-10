@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { buildGridHTML, firstGridRow, renderCircuitSlot } from "../src/core/grid-renderer.js";
+import { buildGridHTML, renderCircuitSlot } from "../src/core/grid-renderer.js";
+import { positionRange } from "../src/helpers/layout.js";
 import type { Circuit, HomeAssistant, CardConfig, MonitoringPointInfo, PanelTopology } from "../src/types.js";
 
 const hass = { states: {}, services: {}, language: "en" } as unknown as HomeAssistant;
@@ -66,7 +67,7 @@ function hassWith(states: Record<string, { state: string; attributes?: Record<st
 function grid(circuit: Circuit, states: Parameters<typeof hassWith>[0]): HTMLElement {
   const topology = { circuits: { kitchen: circuit } } as unknown as PanelTopology;
   const div = document.createElement("div");
-  div.innerHTML = buildGridHTML(topology, 1, hassWith(states), config, null);
+  div.innerHTML = buildGridHTML(topology, { first: 1, last: 2 }, hassWith(states), config, null);
   return div;
 }
 
@@ -180,13 +181,13 @@ describe("a panel whose spaces start below its main-breaker module", () => {
     first_space: 9,
   } as unknown as PanelTopology;
 
-  it("starts the grid at the row of its first space", () => {
-    expect(firstGridRow(topology)).toBe(5);
-    expect(firstGridRow({ circuits: {} } as unknown as PanelTopology)).toBe(1);
+  it("counts its 40 spaces from its first space", () => {
+    expect(positionRange(topology, 40)).toEqual({ first: 9, last: 48 });
+    expect(positionRange({ circuits: {} } as unknown as PanelTopology, 40)).toEqual({ first: 1, last: 40 });
   });
 
   it("draws no rows above it, and keeps the panel's own space numbers", () => {
-    const html = buildGridHTML(topology, 24, hass, config, null, firstGridRow(topology));
+    const html = buildGridHTML(topology, positionRange(topology, 40)!, hass, config, null);
     const labels = [...html.matchAll(/class="tab-label tab-left" style="grid-row: (\d+);[^>]*>(\d+)</g)].map(m => [Number(m[1]), Number(m[2])]);
     expect(labels[0]).toEqual([1, 9]); // space 9 is the first drawn row
     expect(labels.at(-1)).toEqual([20, 47]); // 20 rows for spaces 9..48
