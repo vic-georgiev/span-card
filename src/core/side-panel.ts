@@ -6,6 +6,7 @@ import { HISTORY_RESOLUTIONS, dateInputValue, downloadExport, exportRange, reque
 import { loadListColumns, saveListColumns } from "../helpers/list-columns.js";
 import { INTEGRATION_DOMAIN, SHEDDING_PRIORITIES, SELECTABLE_PRIORITY_KEYS, GRAPH_HORIZONS, DEFAULT_GRAPH_HORIZON, INPUT_DEBOUNCE_MS } from "../constants.js";
 import { t, tf } from "../i18n.js";
+import { attrSelectorValue } from "../helpers/selector.js";
 import { addFavorite, removeFavorite } from "./favorites-store.js";
 import { sortedCircuitsForSection } from "./favorites-sections.js";
 import { subDeviceCharts } from "../helpers/sub-device-power.js";
@@ -913,8 +914,11 @@ class SpanSidePanel extends HTMLElement {
       const titleEl = header.querySelector<HTMLElement>(".title");
       row.appendChild(
         this._buildNameInput(cfg.renameDeviceId, cfg.uuid, cfg.name, name => {
+          const previous = cfg.name;
           cfg.name = name;
+          if (cfg.details) cfg.details.name = name;
           if (titleEl) titleEl.textContent = name;
+          showRenamedOnTiles(this.getRootNode() as ParentNode, cfg.uuid, previous, name);
         })
       );
       section.appendChild(row);
@@ -1960,4 +1964,19 @@ function buildDetailsSection(rows: readonly DetailRow[]): HTMLDivElement {
     section.appendChild(row);
   }
   return section;
+}
+
+/**
+ * Show a confirmed rename on the circuit's tiles and list rows at once.
+ *
+ * SPAN has confirmed the new name by then, but a panel read locally publishes
+ * it on its own schedule, and the tiles would keep the old name until it does.
+ * Only a label still reading the old name is changed, so a slot that names
+ * several circuits sharing a meter keeps the others' names.
+ */
+export function showRenamedOnTiles(root: ParentNode, uuid: string, previous: string, name: string): void {
+  const id = attrSelectorValue(uuid);
+  for (const label of root.querySelectorAll<HTMLElement>(`[data-uuid="${id}"] .circuit-name, [data-uuid="${id}"] .list-circuit-name`)) {
+    if (label.textContent === previous) label.textContent = name;
+  }
 }

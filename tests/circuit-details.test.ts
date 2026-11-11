@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { circuitDetails } from "../src/core/side-panel.js";
+import { circuitDetails, showRenamedOnTiles } from "../src/core/side-panel.js";
 import type { Circuit } from "../src/types.js";
 
 /** A circuit's Details: the breaker and what it serves, as the panel publishes them. */
@@ -46,5 +46,25 @@ describe("a circuit's details", () => {
 
   it("reads a value it has no words for as words", () => {
     expect(rows(circuit({ relay_requester: "MID_CONTROL_DER" }))["Last switched by"]).toBe("mid control der");
+  });
+});
+
+describe("a confirmed rename", () => {
+  it("shows on the circuit's tile and list row at once", () => {
+    const root = document.createElement("div");
+    root.innerHTML = `
+      <div class="circuit-slot" data-uuid="c1"><span class="circuit-name">Kitchen</span></div>
+      <div class="list-row" data-uuid="c1"><span class="list-circuit-name">Kitchen</span></div>
+      <div class="circuit-slot" data-uuid="c2"><span class="circuit-name">Kitchen</span></div>`;
+    showRenamedOnTiles(root, "c1", "Kitchen", "Pantry");
+    const names = [...root.querySelectorAll(".circuit-name, .list-circuit-name")].map(el => el.textContent);
+    expect(names).toEqual(["Pantry", "Pantry", "Kitchen"]);
+  });
+
+  it("leaves a shared slot's other names alone", () => {
+    const root = document.createElement("div");
+    root.innerHTML = `<div class="circuit-slot" data-uuid="c1"><span class="circuit-name">Kitchen · Pantry</span></div>`;
+    showRenamedOnTiles(root, "c1", "Kitchen", "Cooktop");
+    expect(root.querySelector(".circuit-name")!.textContent).toBe("Kitchen · Pantry");
   });
 });
