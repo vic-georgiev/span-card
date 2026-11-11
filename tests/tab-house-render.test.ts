@@ -94,7 +94,7 @@ afterEach(() => {
 });
 
 describe("the house view", () => {
-  async function render(): Promise<HTMLElement> {
+  async function render(house: House = HOUSE): Promise<HTMLElement> {
     mockDiscover.mockImplementation(async (_hass, deviceId) => {
       const topo = TOPOLOGIES[deviceId ?? ""]!;
       return { topology: topo, panelDevice: null, panelSize: topo.panel_size! };
@@ -103,7 +103,7 @@ describe("the house view", () => {
     document.body.appendChild(container);
     const tab = new HouseTab();
     tabs.push(tab);
-    await tab.render(container, hass(), {} as CardConfig, HOUSE);
+    await tab.render(container, hass(), {} as CardConfig, house);
     return container;
   }
 
@@ -133,6 +133,21 @@ describe("the house view", () => {
     expect(card?.textContent).toContain("Feed-through lugs");
     expect(card?.textContent).toContain("SPAN MAIN 16");
     expect(card?.textContent).toContain("412");
+  });
+
+  it("names two panels of one title by their models, and says what supplies the top one", async () => {
+    const [p40, p16] = HOUSE.panels;
+    const container = await render({
+      ...HOUSE,
+      panels: [
+        { ...p40!, title: "Span Panel", model: "MAIN_40", supply: { type: "battery", name: "Tesla Powerwall 3" } },
+        { ...p16!, title: "Span Panel", model: "MAIN_16" },
+      ],
+    });
+    const [top, fed] = container.querySelectorAll("section.house-panel");
+    expect(top!.querySelector(".house-fed-from")?.textContent).toContain("Supplied through Tesla Powerwall 3");
+    expect(top!.querySelector(".feedthrough-card")?.textContent).toContain("Span Panel · MAIN 16");
+    expect(fed!.querySelector(".house-fed-from")?.textContent).toContain("Span Panel · MAIN 40");
   });
 
   it("says what feeds the 16, with both sides of the feed check", async () => {

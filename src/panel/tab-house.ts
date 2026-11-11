@@ -13,10 +13,20 @@ export interface HouseFeed {
   circuit?: string;
 }
 
+/** Name a panel by its title and model, so two panels both titled "Span Panel" tell apart. */
+export function panelLabel(panel: Pick<HousePanel, "title" | "model">): string {
+  const model = panel.model?.replace(/_/g, " ");
+  return model && !panel.title.includes(model) ? `${panel.title} · ${model}` : panel.title;
+}
+
 /** One panel of the house, as `span_panel/house` answers it, in display order. */
 export interface HousePanel {
   serial: string;
   title: string;
+  /** The panel's model ("MAIN_40"), which tells apart two panels of one title. */
+  model?: string | null;
+  /** What supplies a root panel, where the panel itself says so. */
+  supply?: { type: "battery"; name: string } | null;
   entry_id: string;
   device_id: string | null;
   depth: number;
@@ -141,6 +151,7 @@ export class HouseTab {
       section.className = panel.depth > 0 ? "house-panel fed" : "house-panel";
       section.style.marginLeft = panel.depth > 1 ? `${(panel.depth - 1) * 16}px` : "";
       if (panel.depth > 0) section.innerHTML = this._fedFromHTML(panel, byKey);
+      else if (panel.supply) section.innerHTML = this._suppliedHTML(panel.supply.name);
       const content = document.createElement("div");
       section.appendChild(content);
       container.appendChild(section);
@@ -155,7 +166,7 @@ export class HouseTab {
       if (panel.feedthrough_power && fedByLugs.length > 0) {
         const card = document.createElement("div");
         card.className = "feedthrough-card";
-        const targets = fedByLugs.map(child => escapeHtml(child!.title)).join(", ");
+        const targets = fedByLugs.map(child => escapeHtml(panelLabel(child!))).join(", ");
         card.innerHTML = `
           <div>
             <div class="feedthrough-label">${escapeHtml(t("house.feedthrough"))}</div>
@@ -179,10 +190,14 @@ export class HouseTab {
 
   private _fedFromHTML(panel: HousePanel, byKey: Map<string, HousePanel>): string {
     const upstream = byKey.get(panel.feed.upstream ?? "");
-    const title = escapeHtml(upstream?.title ?? panel.feed.upstream ?? "");
+    const title = escapeHtml(upstream ? panelLabel(upstream) : (panel.feed.upstream ?? ""));
     const how = panel.feed.type === "lugs" ? t("house.via_lugs") : t("house.via_branch");
     const check = panel.feed_check ? `<span class="feed-check" data-check-entity="${escapeHtml(panel.feed_check)}"></span>` : "";
     return `<div class="house-fed-from"><span>${escapeHtml(tf("house.fed_from", { how }))} <strong>${title}</strong></span>${check}</div>`;
+  }
+
+  private _suppliedHTML(name: string): string {
+    return `<div class="house-fed-from"><span>${escapeHtml(t("house.supplied_through"))} <strong>${escapeHtml(name)}</strong></span></div>`;
   }
 
   /** Refresh the figures this view owns; each panel's own dashboard refreshes itself. */
