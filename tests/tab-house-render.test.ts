@@ -170,6 +170,11 @@ describe("the house's sync line", () => {
     expect(syncText([undefined, { house_clock_lag_s: 2.34 }])).toBe("Panels in sync · 2.3 s behind live");
   });
 
+  it("shows how finely two local panels are stamped, and the lag at load changes", () => {
+    expect(syncText([undefined, { sample_interval_s: 0.25 }])).toBe("Panels in sync · stamped within 0.25 s");
+    expect(syncText([undefined, { sample_interval_s: 0.25, step_lag_s: -0.5 }])).toBe("Panels in sync · stamped within 0.25 s · load changes 0.50 s apart");
+  });
+
   it("says how far apart the readings were where nothing aligns them", () => {
     expect(syncText([undefined, { readings_apart_s: 3.2 }])).toBe("Not synced · panels read 3.2 s apart");
   });

@@ -241,8 +241,18 @@ export class HouseTab {
 /** The house's sync line, from the feed checks' attributes. */
 export function syncText(checks: ReadonlyArray<Record<string, unknown> | undefined>): string {
   const first = (key: string): number | undefined => checks.map(attributes => Number(attributes?.[key] ?? Number.NaN)).find(Number.isFinite);
+  // Cloud panels: SPAN's frame clock, shown this far behind live.
   const lag = first("house_clock_lag_s");
   if (lag !== undefined) return tf("house.synced", { lag: Math.max(0, lag).toFixed(1) });
+  // Local panels: stamped on Home Assistant's clock, each figure at most one
+  // sample interval older than its stamp, and the lag measured at load changes.
+  const interval = first("sample_interval_s");
+  if (interval !== undefined) {
+    const stepLag = first("step_lag_s");
+    return stepLag !== undefined
+      ? tf("house.synced_local_lag", { interval: interval.toFixed(2), lag: Math.abs(stepLag).toFixed(2) })
+      : tf("house.synced_local", { interval: interval.toFixed(2) });
+  }
   const gap = first("readings_apart_s");
   return gap !== undefined ? tf("house.readings_apart", { gap: gap.toFixed(1) }) : "";
 }
