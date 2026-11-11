@@ -503,6 +503,7 @@ export class DashboardController {
           entities: circuit.entities,
           breaker_rating_a: circuit.breaker_rating_a ?? undefined,
           voltage: circuit.voltage,
+          details: circuit,
           is_user_controllable: circuit.is_user_controllable,
           always_on: circuit.always_on,
           relay_state: circuit.relay_state,

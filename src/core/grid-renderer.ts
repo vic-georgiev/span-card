@@ -16,7 +16,10 @@ import {
   switchPresence,
 } from "./circuit-state.js";
 import { buildSheddingIconHTML, buildTogglePillHTML } from "./circuit-controls.js";
-import type { PanelTopology, Circuit, HomeAssistant, CardConfig, MonitoringStatus, MonitoringPointInfo } from "../types.js";
+import { formatPowerHTML } from "../helpers/format.js";
+import { findBatteryLevelEntity } from "../helpers/entity-finder.js";
+import { resolveSubDevicePower, stateWatts } from "../helpers/sub-device-power.js";
+import type { PanelTopology, Circuit, HomeAssistant, CardConfig, MonitoringStatus, MonitoringPointInfo, ReservedBreaker } from "../types.js";
 
 type SlotLayout = "single" | "row-span" | "col-span";
 
@@ -25,6 +28,15 @@ interface TabMapEntry {
   circuit: Circuit;
   members: readonly Circuit[];
   layout: SlotLayout;
+}
+
+interface ReservedEntry {
+  breaker: ReservedBreaker;
+  layout: SlotLayout;
+}
+
+function slotLayout(tabs: number[]): SlotLayout {
+  return tabs.length === 1 ? "single" : (classifyDualTab(tabs) ?? "single");
 }
 
 /**
@@ -48,17 +60,28 @@ export function buildGridHTML(
     const tabs = circuit.tabs;
     if (!tabs || tabs.length === 0) continue;
     const primaryTab = Math.min(...tabs);
-    const layout: SlotLayout = tabs.length === 1 ? "single" : (classifyDualTab(tabs) ?? "single");
-    tabMap.set(primaryTab, { uuid, circuit, members, layout });
+    tabMap.set(primaryTab, { uuid, circuit, members, layout: slotLayout(tabs) });
     for (const tab of tabs) occupiedTabs.add(tab);
+  }
+
+  // Breakers SPAN API publishes nothing for, which the linked account reported:
+  // drawn in their spaces so those do not read as empty.
+  const reservedMap = new Map<number, ReservedEntry>();
+  for (const breaker of topology.reserved ?? []) {
+    if (breaker.tabs.length === 0 || breaker.tabs.some(tab => occupiedTabs.has(tab))) continue;
+    reservedMap.set(Math.min(...breaker.tabs), { breaker, layout: slotLayout(breaker.tabs) });
+    for (const tab of breaker.tabs) occupiedTabs.add(tab);
   }
 
   const rowsToSkipLeft = new Set<number>();
   const rowsToSkipRight = new Set<number>();
 
-  for (const [primaryTab, entry] of tabMap) {
-    if (entry.layout === "col-span") {
-      const tabs = entry.circuit.tabs;
+  const spans: [number, SlotLayout, number[]][] = [
+    ...[...tabMap].map(([tab, entry]): [number, SlotLayout, number[]] => [tab, entry.layout, entry.circuit.tabs]),
+    ...[...reservedMap].map(([tab, entry]): [number, SlotLayout, number[]] => [tab, entry.layout, entry.breaker.tabs]),
+  ];
+  for (const [primaryTab, layout, tabs] of spans) {
+    if (layout === "col-span") {
       const secondaryTab = Math.max(...tabs);
       const secondaryRow = tabToRow(secondaryTab);
       const col = tabToCol(primaryTab);
@@ -94,6 +117,14 @@ export function buildGridHTML(
 
     gridHTML += leftLabel;
 
+    const leftReserved = reservedMap.get(leftTab);
+    const rightReserved = reservedMap.get(rightTab);
+    if (leftReserved && leftReserved.layout === "row-span") {
+      gridHTML += renderReservedSlot(leftReserved.breaker, topology, gridRow, "2 / 5", "row-span", hass);
+      gridHTML += rightLabel;
+      continue;
+    }
+
     if (leftEntry && leftEntry.layout === "row-span") {
       const { monInfo, sheddingPriority } = lookupMonitoring(leftEntry);
       gridHTML += renderCircuitSlot(
@@ -127,6 +158,8 @@ export function buildGridHTML(
           sheddingPriority,
           leftEntry.members
         );
+      } else if (leftReserved) {
+        gridHTML += renderReservedSlot(leftReserved.breaker, topology, gridRow, "2", leftReserved.layout, hass);
       } else if (!occupiedTabs.has(leftTab) && inRange(leftTab)) {
         gridHTML += renderEmptySlot(gridRow, "2");
       }
@@ -147,6 +180,8 @@ export function buildGridHTML(
           sheddingPriority,
           rightEntry.members
         );
+      } else if (rightReserved) {
+        gridHTML += renderReservedSlot(rightReserved.breaker, topology, gridRow, "4", rightReserved.layout, hass);
       } else if (!occupiedTabs.has(rightTab) && inRange(rightTab)) {
         gridHTML += renderEmptySlot(gridRow, "4");
       }
@@ -251,6 +286,59 @@ function sharedRatingsLabel(members: readonly Circuit[]): string {
 function sharesRelay(members: readonly Circuit[]): boolean {
   const relay = members[0]?.shared_relay_group;
   return !!relay && members.every(member => member.shared_relay_group === relay);
+}
+
+/** The battery's power and charge entities, where the integration placed a battery on the breaker. */
+export function reservedBatteryEntities(breaker: ReservedBreaker, topology: PanelTopology): { power: string | null; soc: string | null } {
+  const battery = breaker.battery_device_id ? topology.sub_devices?.[breaker.battery_device_id] : undefined;
+  if (!battery) return { power: null, soc: null };
+  return { power: resolveSubDevicePower(battery).headlineEid, soc: findBatteryLevelEntity(battery) };
+}
+
+/** The battery's charge as "NN%", or empty while unknown. */
+export function socText(hass: HomeAssistant, entityId: string | null): string {
+  const value = entityId ? Number(hass.states[entityId]?.state) : Number.NaN;
+  return Number.isFinite(value) ? `${Math.round(value)}%` : "";
+}
+
+/**
+ * Render a breaker SPAN API leaves out, in its spaces: named as SPAN names it,
+ * with no switch, and with the battery's power and charge where the
+ * integration says the battery is on it.
+ */
+export function renderReservedSlot(
+  breaker: ReservedBreaker,
+  topology: PanelTopology,
+  row: number,
+  col: string,
+  layout: SlotLayout,
+  hass: HomeAssistant
+): string {
+  const { power, soc } = reservedBatteryEntities(breaker, topology);
+  const rowSpan = layout === "col-span" ? `${row} / span 2` : `${row}`;
+  const layoutClass = layout === "row-span" ? "circuit-row-span" : layout === "col-span" ? "circuit-col-span" : "";
+  const caption = t(breaker.battery_device_id ? "grid.reserved_battery" : "grid.reserved");
+  const powerHTML = power ? formatPowerHTML(stateWatts(hass, power)) : "";
+  return `
+    <div class="circuit-slot circuit-reserved ${layoutClass}"
+         style="grid-row: ${rowSpan}; grid-column: ${col};"
+         data-reserved-tabs="${breaker.tabs.join("/")}"
+         ${power ? `data-reserved-power="${escapeHtml(power)}"` : ""}
+         ${soc ? `data-reserved-soc="${escapeHtml(soc)}"` : ""}>
+      <div class="circuit-header">
+        <div class="circuit-info">
+          <span class="circuit-name">${escapeHtml(breaker.name || t("grid.unknown"))}</span>
+        </div>
+        <div class="circuit-controls">
+          <span class="power-value">${powerHTML}</span>
+        </div>
+      </div>
+      <div class="circuit-status">
+        <span class="reserved-caption">${escapeHtml(caption)}</span>
+        <span class="reserved-soc">${escapeHtml(socText(hass, soc))}</span>
+      </div>
+    </div>
+  `;
 }
 
 /**

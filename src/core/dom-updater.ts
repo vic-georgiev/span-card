@@ -10,6 +10,7 @@ import { measuresOutsidePanel } from "../helpers/layout.js";
 import { meterSlots } from "../helpers/shared-meters.js";
 import { circuitCurrentA, circuitPowerW, drawsAsOn, isGeneration, readsAsProducer, shedPriorityKey, switchPresence } from "./circuit-state.js";
 import { applySheddingIcon, applyTogglePill } from "./circuit-controls.js";
+import { socText } from "./grid-renderer.js";
 import type { HomeAssistant, PanelTopology, CardConfig, HistoryMap, ChartMetricDef } from "../types.js";
 
 // ── Header stats ───────────────────────────────────────────────────────────
@@ -156,6 +157,7 @@ export function updateCircuitDOM(
   }
 
   _updateHeaderStats(root, hass, topology, config, sumReadings(consumption));
+  _updateReservedSlots(root, hass);
 
   const chartMetric: ChartMetricDef = getChartMetric(config);
   const showCurrent = chartMetric.entityRole === "current";
@@ -190,6 +192,17 @@ export function updateCircuitDOM(
       const useLinear = isGeneration(circuit);
       updateChart(chartContainer, hass, history, circuitDuration, chartMetric, isProducer, h, circuit.breaker_rating_a ?? undefined, useLinear);
     }
+  }
+}
+
+/** Refresh the battery's figures on breakers SPAN API leaves out. */
+function _updateReservedSlots(root: Element | ShadowRoot, hass: HomeAssistant): void {
+  for (const slot of root.querySelectorAll<HTMLElement>(".circuit-reserved")) {
+    const power = slot.dataset.reservedPower;
+    const powerEl = slot.querySelector(".power-value");
+    if (power && powerEl) powerEl.innerHTML = formatPowerHTML(stateWatts(hass, power));
+    const socEl = slot.querySelector(".reserved-soc");
+    if (socEl) socEl.textContent = socText(hass, slot.dataset.reservedSoc ?? null);
   }
 }
 

@@ -62,6 +62,15 @@ export interface Circuit {
   shared_meter_group?: string | null;
   /** The group of circuits that share this circuit's relay, by its key; null when it shares none. */
   shared_relay_group?: string | null;
+  /** What the breaker protects against: `OVERCURRENT`, `SHORT_CIRCUIT`, `GROUND_FAULT`, `ARC_FAULT`. */
+  protection_functions?: string[] | null;
+  /** What the circuit feeds: `LOADS`, `SUBPANEL`, `SOLAR`, `STORAGE`, `GENERATOR`, `MIXED` or `UNUSED`. */
+  feeds_role?: string | null;
+  /** Whether PowerUp, SPAN's power control system, manages the circuit, and its rank there. */
+  powerup_managed?: boolean | null;
+  powerup_rank?: number | null;
+  /** What last moved the relay, as the panel reports it: `USER`, `LOAD_SHED`, `PCS`, `NONE`... */
+  relay_requester?: string;
 }
 
 /**
@@ -110,8 +119,22 @@ export interface PanelEntities {
   panel_status?: string; // binary_sensor entity for online/offline state
 }
 
+/**
+ * A breaker SPAN API publishes nothing for, as the panel's linked SPAN account
+ * reported it: on a MAIN 40 the battery's two-pole on 46/48. Read once, when
+ * the account is linked.
+ */
+export interface ReservedBreaker {
+  tabs: number[];
+  name: string;
+  /** The battery sub-device on this breaker, where the integration can tell; null otherwise. */
+  battery_device_id: string | null;
+}
+
 export interface PanelTopology {
   circuits: Record<string, Circuit>;
+  /** Breakers in spaces SPAN API leaves out. Absent from older integrations. */
+  reserved?: ReservedBreaker[];
   sub_devices?: Record<string, SubDevice>;
   panel_entities?: PanelEntities;
   device_name?: string;

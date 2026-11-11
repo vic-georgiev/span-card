@@ -306,6 +306,9 @@ export const CARD_STYLES: string = `
     border-style: dashed;
   }
   .empty-label { color: var(--secondary-text-color, #999); font-size: 0.85em; }
+  .circuit-reserved { border-style: dashed; }
+  .reserved-caption,
+  .reserved-soc { color: var(--secondary-text-color, #999); font-size: 0.85em; }
 
   .circuit-header {
     display: flex;

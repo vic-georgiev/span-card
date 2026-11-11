@@ -5,14 +5,14 @@ import { MAX_CIRCUIT_NAME_LENGTH, renameDeviceFor } from "../helpers/circuit-ren
 import { HISTORY_RESOLUTIONS, dateInputValue, downloadExport, exportRange, requestHistoryExport, type HistoryResolution } from "../helpers/history-export.js";
 import { loadListColumns, saveListColumns } from "../helpers/list-columns.js";
 import { INTEGRATION_DOMAIN, SHEDDING_PRIORITIES, SELECTABLE_PRIORITY_KEYS, GRAPH_HORIZONS, DEFAULT_GRAPH_HORIZON, INPUT_DEBOUNCE_MS } from "../constants.js";
-import { t } from "../i18n.js";
+import { t, tf } from "../i18n.js";
 import { addFavorite, removeFavorite } from "./favorites-store.js";
 import { sortedCircuitsForSection } from "./favorites-sections.js";
 import { subDeviceCharts } from "../helpers/sub-device-power.js";
 import { subDeviceFavoriteEntityId } from "../helpers/sub-device-settings.js";
 import { relayClosed, selectOperable, shedPriorityKey, switchPresence, type CircuitControlFields } from "./circuit-state.js";
 import type { SpanSwitch } from "./span-switch.js";
-import type { HomeAssistant, PanelTopology, GraphSettings, CircuitEntities, CircuitGraphOverride, MonitoringPointInfo } from "../types.js";
+import type { Circuit, HomeAssistant, PanelTopology, GraphSettings, CircuitEntities, CircuitGraphOverride, MonitoringPointInfo } from "../types.js";
 import type { ErrorStore } from "./error-store.js";
 
 // ── Interfaces for config shapes passed to open() ────────────────────────
@@ -59,6 +59,8 @@ export type CircuitModeConfig = CircuitControlFields & {
   tabs: number[];
   breaker_rating_a?: number;
   voltage?: number;
+  /** The circuit as the topology describes it, for its Details section. */
+  details?: Circuit;
   monitoringInfo: MonitoringPointInfo | null;
   showMonitoring?: boolean;
   graphHorizonInfo: GraphHorizonInfo;
@@ -917,6 +919,11 @@ class SpanSidePanel extends HTMLElement {
       );
       section.appendChild(row);
       body.appendChild(section);
+    }
+
+    if (cfg.details) {
+      const details = circuitDetails(cfg.details);
+      if (details.length > 0) body.appendChild(buildDetailsSection(details));
     }
 
     this._renderRelaySection(body, cfg);
@@ -1889,4 +1896,68 @@ try {
   }
 } catch {
   // Scoped custom element registry may throw on duplicate registration after upgrade
+}
+
+/** One row of a circuit's Details section: what it is, and its value. */
+export interface DetailRow {
+  label: string;
+  value: string;
+}
+
+/** A panel value as its translation, or as words where none is known. */
+function labelFor(prefix: string, value: string): string {
+  const key = `${prefix}.${value.toLowerCase()}`;
+  const translated = t(key);
+  return translated === key ? value.toLowerCase().replace(/_/g, " ") : translated;
+}
+
+/**
+ * The facts the panel publishes about a circuit's breaker and what it serves,
+ * one row each, leaving out whatever the panel does not say.
+ */
+export function circuitDetails(circuit: Circuit): DetailRow[] {
+  const rows: DetailRow[] = [];
+  const tabs = [...(circuit.tabs ?? [])].sort((a, b) => a - b);
+  if (tabs.length > 0) rows.push({ label: t("details.spaces"), value: tabs.join(" / ") });
+  if (circuit.breaker_rating_a) {
+    const poles = tabs.length > 0 ? ` \u00b7 ${tf("details.poles", { count: String(tabs.length) })}` : "";
+    rows.push({ label: t("details.breaker"), value: `${Math.round(circuit.breaker_rating_a)} A${poles}` });
+  }
+  if (circuit.protection_functions && circuit.protection_functions.length > 0) {
+    rows.push({ label: t("details.protection"), value: circuit.protection_functions.map(fn => labelFor("details.protection", fn)).join(", ") });
+  }
+  if (circuit.voltage) rows.push({ label: t("details.voltage"), value: `${circuit.voltage} V` });
+  if (circuit.feeds_role) rows.push({ label: t("details.feeds"), value: labelFor("details.feeds", circuit.feeds_role) });
+  if (circuit.powerup_managed === true) {
+    const rank = circuit.powerup_rank ?? null;
+    rows.push({ label: t("details.powerup"), value: rank !== null ? tf("details.powerup_rank", { rank: String(rank) }) : t("details.powerup_managed") });
+  } else if (circuit.powerup_managed === false) {
+    rows.push({ label: t("details.powerup"), value: t("details.powerup_unmanaged") });
+  }
+  if (circuit.relay_requester && circuit.relay_requester !== "UNKNOWN") {
+    rows.push({ label: t("details.relay_requester"), value: labelFor("details.requester", circuit.relay_requester) });
+  }
+  return rows;
+}
+
+function buildDetailsSection(rows: readonly DetailRow[]): HTMLDivElement {
+  const section = document.createElement("div");
+  section.className = "section details-section";
+  const label = document.createElement("div");
+  label.className = "section-label";
+  label.textContent = t("details.title");
+  section.appendChild(label);
+  for (const { label: name, value } of rows) {
+    const row = document.createElement("div");
+    row.className = "field-row";
+    const nameEl = document.createElement("span");
+    nameEl.className = "field-label";
+    nameEl.textContent = name;
+    const valueEl = document.createElement("span");
+    valueEl.className = "detail-value";
+    valueEl.textContent = value;
+    row.append(nameEl, valueEl);
+    section.appendChild(row);
+  }
+  return section;
 }

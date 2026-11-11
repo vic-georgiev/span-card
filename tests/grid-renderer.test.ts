@@ -196,3 +196,55 @@ describe("a panel whose spaces start below its main-breaker module", () => {
     expect(html).toMatch(/grid-row: 19 \/ span 2;[^"]*"[^>]*>|grid-row: 19 \/ span 2/);
   });
 });
+
+describe("a breaker SPAN API leaves out", () => {
+  const battery = {
+    name: "Battery",
+    type: "bess",
+    entities: {
+      "sensor.battery_power": { domain: "sensor", original_name: "Battery Power", unique_id: "x_bess_power" },
+      "sensor.battery_level": { domain: "sensor", original_name: "Battery Level", unique_id: "x_battery_level" },
+    },
+  };
+  const topology = {
+    circuits: { kitchen: makeCircuit({ name: "Kitchen", tabs: [9] }) },
+    sub_devices: { "dev-bess": battery },
+    reserved: [{ tabs: [46, 48], name: "Battery", battery_device_id: "dev-bess" }],
+    first_space: 9,
+  } as unknown as PanelTopology;
+
+  function reservedSlot(states: Record<string, { state: string }>, top: PanelTopology = topology): HTMLElement | null {
+    const div = document.createElement("div");
+    div.innerHTML = buildGridHTML(top, positionRange(top, 40)!, hassWith(states), config, null);
+    return div.querySelector<HTMLElement>(".circuit-reserved");
+  }
+
+  it("is drawn in its spaces, named as SPAN names it, with no switch", () => {
+    const slot = reservedSlot({});
+    expect(slot).not.toBeNull();
+    expect(slot!.getAttribute("style")).toContain("grid-row: 19 / span 2");
+    expect(slot!.querySelector(".circuit-name")!.textContent).toBe("Battery");
+    expect(slot!.querySelector(".toggle-knob")).toBeNull();
+    expect(slot!.querySelector(".circuit-gear")).toBeNull();
+    expect(slot!.querySelector(".reserved-caption")!.textContent).toBe("Reserved for the battery");
+  });
+
+  it("shows the battery's power and charge on it", () => {
+    const slot = reservedSlot({ "sensor.battery_power": { state: "1500" }, "sensor.battery_level": { state: "87.4" } });
+    expect(slot!.dataset.reservedPower).toBe("sensor.battery_power");
+    expect(slot!.querySelector(".power-value")!.textContent).toContain("1.50");
+    expect(slot!.querySelector(".reserved-soc")!.textContent).toBe("87%");
+  });
+
+  it("is only reserved where no battery is placed on it", () => {
+    const top = { ...topology, reserved: [{ tabs: [46, 48], name: "Battery", battery_device_id: null }] } as PanelTopology;
+    const slot = reservedSlot({}, top);
+    expect(slot!.querySelector(".reserved-caption")!.textContent).toBe("Reserved");
+    expect(slot!.dataset.reservedPower).toBeUndefined();
+  });
+
+  it("never covers a circuit the panel publishes", () => {
+    const top = { ...topology, reserved: [{ tabs: [9], name: "Ghost", battery_device_id: null }] } as PanelTopology;
+    expect(reservedSlot({}, top)).toBeNull();
+  });
+});
