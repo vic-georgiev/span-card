@@ -211,15 +211,10 @@ export class HouseTab {
     const houseEl = container.querySelector("[data-house-power]");
     if (houseEl) houseEl.innerHTML = total.partial ? formatPowerHTML(null) : formatPowerHTML(total.total);
 
-    // How far behind live the panels are shown, so that they are shown at one
-    // instant: the integration's house clock, reported on any feed check.
+    // Where a clock shows the panels at one instant, how far behind live that
+    // is; otherwise how far apart the two panels' latest readings were taken.
     const syncEl = container.querySelector("[data-house-sync]");
-    if (syncEl) {
-      const lags = house.panels
-        .map(panel => (panel.feed_check ? Number(hass.states[panel.feed_check]?.attributes?.house_clock_lag_s) : Number.NaN))
-        .filter(Number.isFinite);
-      syncEl.textContent = lags.length > 0 ? tf("house.synced", { lag: Math.max(0, lags[0]!).toFixed(1) }) : "";
-    }
+    if (syncEl) syncEl.textContent = syncText(house.panels.map(panel => (panel.feed_check ? hass.states[panel.feed_check]?.attributes : undefined)));
 
     for (const el of container.querySelectorAll<HTMLElement>("[data-power-entity]")) {
       el.innerHTML = formatPowerHTML(readNumber(hass.states[el.dataset.powerEntity ?? ""]));
@@ -241,4 +236,13 @@ export class HouseTab {
       el.innerHTML = parts.filter(Boolean).join(" · ");
     }
   }
+}
+
+/** The house's sync line, from the feed checks' attributes. */
+export function syncText(checks: ReadonlyArray<Record<string, unknown> | undefined>): string {
+  const first = (key: string): number | undefined => checks.map(attributes => Number(attributes?.[key] ?? Number.NaN)).find(Number.isFinite);
+  const lag = first("house_clock_lag_s");
+  if (lag !== undefined) return tf("house.synced", { lag: Math.max(0, lag).toFixed(1) });
+  const gap = first("readings_apart_s");
+  return gap !== undefined ? tf("house.readings_apart", { gap: gap.toFixed(1) }) : "";
 }

@@ -7,7 +7,7 @@ vi.mock("../src/card/card-discovery.js", async importOriginal => ({
 }));
 
 import { discoverTopology } from "../src/card/card-discovery.js";
-import { HouseTab, type House } from "../src/panel/tab-house.js";
+import { HouseTab, syncText, type House } from "../src/panel/tab-house.js";
 import "../src/core/side-panel.js";
 
 /**
@@ -162,5 +162,19 @@ describe("the house view", () => {
     const container = await render();
     const firstLabels = [...container.querySelectorAll(".panel-grid")].map(grid => grid.querySelector(".tab-label.tab-left")?.textContent);
     expect(firstLabels).toEqual(["9", "9"]);
+  });
+});
+
+describe("the house's sync line", () => {
+  it("shows the house clock's delay where the panels are aligned", () => {
+    expect(syncText([undefined, { house_clock_lag_s: 2.34 }])).toBe("Panels in sync · 2.3 s behind live");
+  });
+
+  it("says how far apart the readings were where nothing aligns them", () => {
+    expect(syncText([undefined, { readings_apart_s: 3.2 }])).toBe("Not synced · panels read 3.2 s apart");
+  });
+
+  it("says nothing until a check has both figures", () => {
+    expect(syncText([undefined, { aligned: false }])).toBe("");
   });
 });
